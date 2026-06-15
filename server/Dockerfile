@@ -14,10 +14,13 @@
 # ── Stage 1: Dependency installer ─────────────────────────────────────────
 FROM node:20-alpine AS deps
 
+# Install build tools needed for native node C++ modules (like bcrypt)
+RUN apk add --no-cache make gcc g++ python3
+
 # Install only production deps cleanly.
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts \
+RUN npm ci --omit=dev \
     && npm cache clean --force
 
 
