@@ -63,7 +63,7 @@ EXPOSE 5000
 # Docker / Kubernetes uses this to decide when the container is ready.
 # Retries 3×, waiting 10 s between attempts, starting 15 s after startup.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:5000/api/v1/health || exit 1
+  CMD wget -qO- http://localhost:$PORT/api/v1/health || exit 1
 
 # ── Entrypoint ────────────────────────────────────────────────────────────
 CMD ["node", "src/server.js"]
