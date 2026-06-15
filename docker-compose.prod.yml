@@ -1,0 +1,220 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.prod.yml  —  PRODUCTION
+#
+# Brings up:
+#   mongo   — MongoDB (not exposed externally, internal network only)
+#   api     — Node.js API (read-only FS, non-root user, secrets mounted)
+#   nginx   — TLS termination, rate limiting, reverse proxy
+#
+# Docker secrets (files in ./secrets/) are mounted at /run/secrets/<name>
+# inside each container. The env.js config reads *_FILE variants and loads
+# the value from disk — the plaintext secret is NEVER in an env var.
+#
+# Usage:
+#   ./secrets/generate.sh              # create secret files (run once)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f
+#   docker compose -f docker-compose.prod.yml exec api node src/scripts/seed.js
+#
+# Deployment checklist:
+#   [ ] SSL certs in nginx/ssl/fullchain.pem + privkey.pem
+#   [ ] All secrets generated with generate.sh
+#   [ ] CORS_ORIGIN set to your actual domain(s) in server/.env.prod
+#   [ ] MongoDB MONGO_INITDB_ROOT_USERNAME / PASSWORD set in secrets
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB ───────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: gymmaster-mongo-prod
+    restart: always
+    # NOT exposed on any host port — only reachable on the internal network.
+    expose:
+      - "27017"
+    volumes:
+      - mongo-data-prod:/data/db
+      - ./mongo-init/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    environment:
+      MONGO_INITDB_DATABASE: gymmaster
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/mongo_root_user
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+    secrets:
+      - mongo_root_user
+      - mongo_root_password
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok",
+             "-u", "$$MONGO_INITDB_ROOT_USERNAME",
+             "-p", "$$MONGO_INITDB_ROOT_PASSWORD",
+             "--authenticationDatabase", "admin"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    # Security: restrict what the container can do at the kernel level.
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits — tune to your server capacity.
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+
+  # ── API ───────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: gymmaster-api:latest
+    container_name: gymmaster-api-prod
+    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
+    expose:
+      - "5000"          # only reachable via nginx on the internal network
+    volumes:
+      # Read-only filesystem: the app writes nothing to its own layer.
+      # Writable /tmp provided for any transient needs.
+      - /tmp/gymmaster:/tmp/gymmaster
+    secrets:
+      - jwt_access_secret
+      - jwt_refresh_secret
+      - mongodb_uri
+      - razorpay_key_secret
+      - razorpay_webhook_secret
+      - stripe_secret_key
+      - stripe_webhook_secret
+      - exercise_api_key
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      # Non-secret config (safe in env vars)
+      PAYMENT_GATEWAY: razorpay
+      PAYMENT_CURRENCY: INR
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 30d
+      BCRYPT_ROUNDS: 12
+      AUDIT_LOG_TTL_DAYS: 365
+      CORS_ORIGIN: "https://api.gymmaster.app"   # <-- update to your domain
+      EXERCISE_API_HOST: exercisedb.p.rapidapi.com
+      # Point to Docker secrets files — env.js reads these
+      MONGODB_URI_FILE: /run/secrets/mongodb_uri
+      JWT_ACCESS_SECRET_FILE: /run/secrets/jwt_access_secret
+      JWT_REFRESH_SECRET_FILE: /run/secrets/jwt_refresh_secret
+      RAZORPAY_KEY_SECRET_FILE: /run/secrets/razorpay_key_secret
+      RAZORPAY_WEBHOOK_SECRET_FILE: /run/secrets/razorpay_webhook_secret
+      STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+      EXERCISE_API_KEY_FILE: /run/secrets/exercise_api_key
+      # Public keys — safe in env vars
+      RAZORPAY_KEY_ID: rzp_live_XXXXXXXXXXXXXXXX   # <-- replace
+      STRIPE_PUBLISHABLE_KEY: pk_live_XXXXXXXXXXXX  # <-- replace
+    networks:
+      - backend
+      - frontend
+    read_only: true           # container filesystem is read-only
+    tmpfs:
+      - /tmp:size=64m,mode=1777   # writable temp space only
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL                   # drop all Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE      # allow binding to port < 1024 (not needed at 5000, but kept for clarity)
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 2             # run 2 replicas for zero-downtime deploys
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first    # start new before stopping old
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+  # ── Nginx (TLS termination + rate limiting) ───────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: gymmaster-nginx:latest
+    container_name: gymmaster-nginx-prod
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Mount TLS certificates (managed by Certbot on the host or a secrets manager)
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      # ACME challenge directory for Let's Encrypt renewal
+      - certbot-webroot:/var/www/certbot:ro
+    networks:
+      - frontend
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO/dev/null", "--server-response", "http://localhost/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+
+# ── Docker Secrets ────────────────────────────────────────────────────────────
+# Each secret is a file in ./secrets/. Generate with ./secrets/generate.sh.
+# Files must exist before running docker compose up.
+secrets:
+  mongo_root_user:
+    file: ./secrets/mongo_root_user.txt
+  mongo_root_password:
+    file: ./secrets/mongo_root_password.txt
+  mongodb_uri:
+    file: ./secrets/mongodb_uri.txt
+  jwt_access_secret:
+    file: ./secrets/jwt_access_secret.txt
+  jwt_refresh_secret:
+    file: ./secrets/jwt_refresh_secret.txt
+  razorpay_key_secret:
+    file: ./secrets/razorpay_key_secret.txt
+  razorpay_webhook_secret:
+    file: ./secrets/razorpay_webhook_secret.txt
+  stripe_secret_key:
+    file: ./secrets/stripe_secret_key.txt
+  stripe_webhook_secret:
+    file: ./secrets/stripe_webhook_secret.txt
+  exercise_api_key:
+    file: ./secrets/exercise_api_key.txt
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  frontend:
+    driver: bridge
+    # nginx <-> api (external traffic flows through nginx)
+  backend:
+    driver: bridge
+    internal: true    # mongo is NEVER reachable from outside this network
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  mongo-data-prod:
+    driver: local
+  certbot-webroot:
+    driver: local

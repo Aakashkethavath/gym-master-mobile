@@ -1,0 +1,28 @@
+# Source control
+.git
+.gitignore
+
+# Secrets — NEVER bake these into the image
+.env
+.env.*
+secrets/
+
+# Dev dependencies (installed fresh in the multi-stage build)
+node_modules
+
+# Test + tooling artefacts
+*.test.js
+*.spec.js
+coverage/
+.nyc_output/
+jest.config.*
+
+# Logs
+logs/
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gym Master — Member Feedback</title>
+  <meta name="description" content="Share your gym experience. Submit a review and see live member feedback." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════════════════════ */
+    :root {
+      /* Backgrounds */
+      --bg:        #0D0D0D;
+      --surface:   #161616;
+      --surface-2: #1F1F1F;
+      --surface-3: #2A2A2A;
+
+      /* Borders */
+      --border:        #2C2C2C;
+      --border-strong: #3D3D3D;
+
+      /* Text */
+      --ink:     #F0F0ED;
+      --ink-2:   #A0A09C;
+      --ink-3:   #616160;
+
+      /* Accent — electric lime */
+      --accent:        #CCFF50;
+      --accent-dark:   #90B832;
+      --accent-subtle: #1A2A06;
+
+      /* Semantic */
+      --success:        #4ADE80;
+      --success-subtle: #052912;
+      --warning:        #FBB040;
+      --warning-subtle: #2A1D00;
+      --danger:         #F87171;
+      --danger-subtle:  #2D0707;
+      --info:           #60A5FA;
+
+      /* Spacing scale */
+      --s1: 4px;  --s2: 8px;   --s3: 12px; --s4: 16px;
+      --s5: 20px; --s6: 24px;  --s8: 32px; --s10: 40px;
+
+      /* Radius */
+      --r-sm: 6px;  --r-md: 10px;
+      --r-lg: 14px; --r-xl: 20px; --r-full: 9999px;
+
+      /* Typography */
+      --font-display: 'Syne', system-ui, sans-serif;
+      --font-body:    'Manrope', system-ui, sans-serif;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       ANIMATIONS
+    ═══════════════════════════════════════════════════════════════ */
+
+    /* New review card — slides in from the right with spring overshoot */
+    @keyframes slideInRight {
+      0%   { opacity: 0; transform: translateX(24px) scale(0.97); }
+      60%  { opacity: 1; transform: translateX(-4px) scale(1.01); }
+      100% { opacity: 1; transform: translateX(0)   scale(1); }
+    }
+
+    /* Subtle upward fade for errors, toasts, stat updates */
+    @keyframes slideInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Star selection — elastic pop */
+    @keyframes starPop {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.55) rotate(-8deg); }
+      65%  { transform: scale(0.92) rotate(4deg); }
+      100% { transform: scale(1) rotate(0); }
+    }
+
+    /* Bar fill — triggered once on first render */
+    @keyframes barGrow {
+      from { width: 0; }
+    }
+
+    /* Success checkmark draw */
+    @keyframes checkDraw {
+      from { stroke-dashoffset: 60; }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    /* Toast slides up from bottom */
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(-8px); }
+    }
+
+    /* Pulsing live dot */
+    @keyframes livePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6); }
+      50%       { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
+    }
+
+    /* Stat card value flash on update */
+    @keyframes statFlash {
+      0%   { color: var(--accent); }
+      100% { color: var(--ink); }
+    }
+
+    /* Page fade in */
+    @keyframes pageFade {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    /* Focus ring — keyboard navigation */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: var(--r-sm);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       LAYOUT
+    ═══════════════════════════════════════════════════════════════ */
+    .page-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--s6) var(--s6) 80px;
+      animation: pageFade 0.5s ease both;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       TOPBAR
+    ═══════════════════════════════════════════════════════════════ */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--s8);
+      padding-bottom: var(--s6);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: var(--s3);
+      text-decoration: none;
+    }
+    .brand-logo {
+      width: 40px; height: 40px;
+      background: var(--accent);
+      border-radius: var(--r-md);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 20px;
+      color: var(--bg);
+      flex-shrink: 0;
+    }
+    .brand-name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--ink);
+      letter-spacing: 2px;
+    }
+    .topbar-tagline {
+      font-size: 13px;
+      color: var(--ink-3);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       PAGE HEADER
+    ═══════════════════════════════════════════════════════════════ */
+    .page-header { margin-bottom: var(--s8); }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: var(--s2);
+    }
+    .page-title span { color: var(--accent); }
+    .page-subtitle {
+      font-size: 15px;
+      color: var(--ink-2);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       STATS ROW
+    ═══════════════════════════════════════════════════════════════ */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: var(--s3);
+      margin-bottom: var(--s8);
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--s4) var(--s5);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s ease;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .stat-card:hover { border-color: var(--border-strong); }
+    .stat-card:hover::before { opacity: 1; }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: var(--s2);
+    }
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-value.updated { animation: statFlash 0.8s ease; }
+    .stat-sub {
+      font-size: 11px;
+      color: var(--ink-3);
+    }
+    .stat-icon {
+      position: absolute;
+      top: var(--s4);
+      right: var(--s4);
+      font-size: 20px;
+      opacity: 0.2;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       MAIN GRID
+    ═══════════════════════════════════════════════════════════════ */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: var(--s5);
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       CARD
+    ═══════════════════════════════════════════════════════════════ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: var(--s6);
+    }
+    .card + .card { margin-top: var(--s4); }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: var(--s5);
+      display: flex;
+      align-items: center;
+      gap: var(--s2);
+    }
+    .card-title-icon {
+      width: 28px; height: 28px;
+      background: var(--accent-subtle);
+      border-radius: var(--r-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       FORM
+    ═══════════════════════════════════════════════════════════════ */
+    .form-field { margin-bottom: var(--s5); }
+    .form-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-2);
+      margin-bottom: var(--s2);
+      letter-spacing: 0.02em;
+    }
+    .label-required {
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    /* Text inputs */
+    .form-input,
+    .form-textarea {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 14px;
+      padding: 12px var(--s4);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      outline: none;
+    }
+    .form-input::placeholder,
+    .form-textarea::placeholder {
+      color: var(--ink-3);
+    }
+    .form-input:hover,
+    .form-textarea:hover {
+      border-color: var(--border-strong);
+    }
+    .form-input:focus,
+    .form-textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(204, 255, 80, 0.12);
+      background: var(--surface-3);
+    }
+    .form-input.error,
+    .form-textarea.error {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.1);
+    }
+    .form-textarea {
+      resize: vertical;
+      min-height: 110px;
+      line-height: 1.6;
+    }
+
+    /* Character counter */
+    .char-counter {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--ink-3);
+      transition: color 0.2s ease;
+    }
+    .char-counter.warn { color: var(--warning); }
+    .char-counter.limit { color: var(--danger); }
+
+    /* Field error message */
+    .field-error {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--danger);
+      animation: slideInUp 0.2s ease;
+    }
+    .field-error.show { display: flex; }
+    .field-error::before {
+      content: '!';
+      width: 14px; height: 14px;
+      background: var(--danger-subtle);
+      border: 1px solid var(--danger);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      flex-shrink: 0;
+      line-height: 14px;
+      text-align: center;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       STAR RATING
+    ═══════════════════════════════════════════════════════════════ */
+    .star-widget {
+      display: flex;
+      align-items: center;
+      gap: var(--s3);
+      flex-wrap: wrap;
+    }
+    .star-group {
+      display: flex;
+      gap: 3px;
+    }
+    .star-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 3px;
+      font-size: 32px;
+      line-height: 1;
+      color: var(--surface-3);
+      transition: transform 0.12s ease, color 0.15s ease, opacity 0.15s ease;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+    .star-btn:hover { transform: scale(1.15); }
+    .star-btn.lit    { color: var(--warning); }
+    .star-btn.preview {
+      color: var(--warning);
+      opacity: 0.5;
+    }
+    .star-btn.pop { animation: starPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .star-btn[aria-pressed="true"] { color: var(--warning); }
+
+    .rating-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 70px;
+      transition: opacity 0.2s ease;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SUBMIT BUTTON
+    ═══════════════════════════════════════════════════════════════ */
+    .submit-btn {
+      width: 100%;
+      padding: 14px var(--s6);
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--r-md);
+      font-family: var(--font-body);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.12s ease, background 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--s2);
+      margin-top: var(--s3);
+      letter-spacing: 0.02em;
+    }
+    .submit-btn:hover:not(:disabled) {
+      background: #D8FF5A;
+    }
+    .submit-btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .submit-spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: var(--bg);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SUCCESS STATE
+    ═══════════════════════════════════════════════════════════════ */
+    .success-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--s10) var(--s6);
+      animation: pageF 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes pageF {
+      from { opacity: 0; transform: scale(0.9); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .success-state.show { display: flex; }
+
+    .success-ring {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: var(--success-subtle);
+      border: 2px solid var(--success);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: var(--s5);
+    }
+    .success-ring svg {
+      width: 40px; height: 40px;
+    }
+    .success-ring svg path {
+      stroke: var(--success);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      stroke-dasharray: 60;
+      stroke-dashoffset: 0;
+      animation: checkDraw 0.5s ease 0.2s both;
+    }
+    .success-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--ink);
+      margin-bottom: var(--s2);
+    }
+    .success-sub {
+      font-size: 14px;
+      color: var(--ink-2);
+      margin-bottom: var(--s6);
+      line-height: 1.6;
+    }
+    .btn-secondary {
+      padding: 10px var(--s6);
+      background: var(--surface-2);
+      color: var(--ink-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .btn-secondary:hover {
+      background: var(--surface-3);
+      border-color: var(--border-strong);
+      color: var(--ink);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       RATING BREAKDOWN BARS
+    ═══════════════════════════════════════════════════════════════ */
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      gap: var(--s3);
+      margin-bottom: 10px;
+      cursor: pointer;
+      border-radius: var(--r-sm);
+      padding: 3px 0;
+      transition: opacity 0.15s ease;
+    }
+    .breakdown-row:hover { opacity: 0.8; }
+    .breakdown-row:last-child { margin-bottom: 0; }
+    .bd-star-lbl {
+      width: 36px;
+      font-size: 12px;
+      color: var(--ink-2);
+      text-align: right;
+      flex-shrink: 0;
+      font-weight: 500;
+    }
+    .bd-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bd-fill {
+      height: 100%;
+      background: var(--warning);
+      border-radius: 3px;
+      width: 0;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .bd-count {
+      width: 28px;
+      font-size: 12px;
+      color: var(--ink-3);
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .bd-pct {
+      width: 36px;
+      font-size: 11px;
+      color: var(--ink-3);
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       REVIEWS FEED
+    ═══════════════════════════════════════════════════════════════ */
+    .feed-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--s4);
+      flex-wrap: wrap;
+      gap: var(--s3);
+    }
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--success);
+      background: var(--success-subtle);
+      padding: 4px 10px;
+      border-radius: var(--r-full);
+      border: 1px solid rgba(74, 222, 128, 0.2);
+    }
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: livePulse 2s ease-in-out infinite;
+    }
+
+    /* Filter chips */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--s2);
+      flex-wrap: wrap;
+      margin-bottom: var(--s4);
+    }
+    .filter-label {
+      font-size: 11px;
+      color: var(--ink-3);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .chip {
+      padding: 5px 12px;
+      border-radius: var(--r-full);
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--ink-2);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .chip:hover {
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+    }
+    .chip:active { transform: scale(0.95); }
+    .chip.active {
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border-color: rgba(204, 255, 80, 0.3);
+    }
+
+    /* Sort row */
+    .sort-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--s5);
+      flex-wrap: wrap;
+      gap: var(--s2);
+    }
+    .sort-row-left {
+      font-size: 13px;
+      color: var(--ink-3);
+    }
+    .sort-row-left strong { color: var(--ink-2); }
+    .sort-select {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--ink-2);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .sort-select:focus { border-color: var(--accent); }
+
+    /* Divider */
+    .feed-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0;
+    }
+
+    /* Review list */
+    .reviews-list { }
+
+    /* Individual review card */
+    .review-item {
+      padding: var(--s5) 0;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s ease;
+    }
+    .review-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .review-item.new-entry {
+      animation: slideInRight 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .review-header {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--s3);
+      margin-bottom: var(--s3);
+    }
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      font-family: var(--font-display);
+      transition: transform 0.2s ease;
+    }
+    .review-item:hover .avatar { transform: scale(1.08); }
+
+    .review-meta { flex: 1; min-width: 0; }
+    .reviewer-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .review-time {
+      font-size: 11px;
+      color: var(--ink-3);
+    }
+
+    .review-stars-display {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .mini-star { font-size: 14px; }
+    .mini-star.lit   { color: var(--warning); }
+    .mini-star.empty { color: var(--surface-3); }
+
+    .review-body {
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.7;
+      margin: var(--s2) 0 0;
+    }
+
+    /* Rating badge on card */
+    .rating-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: var(--r-full);
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .rating-badge.r5 { background: var(--success-subtle); color: var(--success); }
+    .rating-badge.r4 { background: #1A2E10; color: #A3E635; }
+    .rating-badge.r3 { background: var(--warning-subtle); color: var(--warning); }
+    .rating-badge.r2 { background: #2D1500; color: #FB923C; }
+    .rating-badge.r1 { background: var(--danger-subtle); color: var(--danger); }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: var(--s10) var(--s6);
+      color: var(--ink-3);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: var(--s4); }
+    .empty-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink-2);
+      margin-bottom: var(--s2);
+    }
+    .empty-sub { font-size: 13px; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       TOAST NOTIFICATION
+    ═══════════════════════════════════════════════════════════════ */
+    .toast-wrap {
+      position: fixed;
+      bottom: var(--s6);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: var(--s3);
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-lg);
+      padding: var(--s3) var(--s5);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      white-space: nowrap;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .toast.out { animation: toastOut 0.3s ease forwards; }
+    .toast-icon { font-size: 16px; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       AVERAGE RATING DISPLAY
+    ═══════════════════════════════════════════════════════════════ */
+    .avg-display {
+      display: flex;
+      align-items: center;
+      gap: var(--s4);
+      padding: var(--s5);
+      background: var(--surface-2);
+      border-radius: var(--r-lg);
+      margin-bottom: var(--s5);
+    }
+    .avg-number {
+      font-family: var(--font-display);
+      font-size: 52px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .avg-right { flex: 1; }
+    .avg-stars {
+      display: flex;
+      gap: 2px;
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    .avg-sub {
+      font-size: 12px;
+      color: var(--ink-3);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       RESPONSIVE
+    ═══════════════════════════════════════════════════════════════ */
+    @media (max-width: 640px) {
+      .page-wrap { padding: var(--s4) var(--s4) 60px; }
+      .topbar { margin-bottom: var(--s5); }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .card { padding: var(--s4); }
+      .star-btn { font-size: 28px; }
+    }
+    @media (max-width: 400px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .star-btn { font-size: 26px; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════════════════════════ */
+    .footer {
+      margin-top: var(--s10);
+      padding-top: var(--s6);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--s3);
+    }
+    .footer-copy { font-size: 12px; color: var(--ink-3); }
+    .footer-links { display: flex; gap: var(--s4); }
+    .footer-link {
+      font-size: 12px;
+      color: var(--ink-3);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-link:hover { color: var(--accent); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+  </style>
+</head>
+
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     TOP BAR
+════════════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <nav class="topbar" aria-label="Site header">
+    <a href="#" class="brand" aria-label="Gym Master home">
+      <div class="brand-logo" aria-hidden="true">G</div>
+      <span class="brand-name">GYM MASTER</span>
+    </a>
+    <span class="topbar-tagline">Member Feedback Portal</span>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PAGE HEADER
+  ════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <h1 class="page-title">Your <span>feedback</span> shapes<br>our gym.</h1>
+    <p class="page-subtitle">Share your experience — every review helps us improve for every member.</p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       STATS ROW
+  ════════════════════════════════════════════════════════════════ -->
+  <section class="stats-grid" aria-label="Review statistics">
+    <div class="stat-card">
+      <div class="stat-label">Average Rating</div>
+      <div class="stat-value" id="stat-avg">—</div>
+      <div class="stat-sub">out of 5 stars</div>
+      <div class="stat-icon" aria-hidden="true">★</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Reviews</div>
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-sub">all time</div>
+      <div class="stat-icon" aria-hidden="true">✦</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">5-Star Rate</div>
+      <div class="stat-value" id="stat-five">—</div>
+      <div class="stat-sub">of all reviews</div>
+      <div class="stat-icon" aria-hidden="true">◈</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">This Month</div>
+      <div class="stat-value" id="stat-month">0</div>
+      <div class="stat-sub">new reviews</div>
+      <div class="stat-icon" aria-hidden="true">◷</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       MAIN GRID — Form left, Feed right
+  ════════════════════════════════════════════════════════════════ -->
+  <main class="main-grid">
+
+    <!-- ── LEFT COLUMN: Form + Breakdown ── -->
+    <div>
+
+      <!-- FORM CARD -->
+      <article class="card" id="form-card" aria-label="Submit a review">
+        <h2 class="card-title">
+          <span class="card-title-icon" aria-hidden="true">✍</span>
+          Share your experience
+        </h2>
+
+        <!-- ── FORM ── -->
+        <form id="feedback-form" novalidate aria-label="Member feedback form">
+
+          <!-- Name field -->
+          <div class="form-field">
+            <label class="form-label" for="field-name">
+              Your name
+              <span class="label-required">Required</span>
+            </label>
+            <input
+              type="text"
+              id="field-name"
+              class="form-input"
+              placeholder="e.g. Priya Sharma"
+              maxlength="60"
+              autocomplete="name"
+              aria-required="true"
+              aria-describedby="err-name"
+            />
+            <div class="field-error" id="err-name" role="alert" aria-live="polite">
+              Please enter your name
+            </div>
+          </div>
+
+          <!-- Star rating -->
+          <div class="form-field">
+            <div class="form-label" id="rating-label-text">
+              Your rating
+              <span class="label-required">Required</span>
+            </div>
+            <div class="star-widget">
+              <div
+                id="star-group"
+                class="star-group"
+                role="radiogroup"
+                aria-labelledby="rating-label-text"
+                aria-required="true"
+              ></div>
+              <span class="rating-label" id="rating-label-text-value" aria-live="polite"></span>
+            </div>
+            <div class="field-error" id="err-rating" role="alert" aria-live="polite">
+              Please select a rating
+            </div>
+          </div>
+
+          <!-- Comment field -->
+          <div class="form-field">
+            <label class="form-label" for="field-comment">
+              Your review
+              <span class="label-required">Required</span>
+            </label>
+            <textarea
+              id="field-comment"
+              class="form-textarea"
+              placeholder="What did you love? What could we improve?"
+              maxlength="400"
+              rows="5"
+              aria-required="true"
+              aria-describedby="char-count err-comment"
+            ></textarea>
+            <div class="char-counter" id="char-count" aria-live="polite">0 / 400</div>
+            <div class="field-error" id="err-comment" role="alert" aria-live="polite">
+              Please write at least 10 characters
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="submit-btn" id="submit-btn">
+            Submit Review
+          </button>
+
+        </form><!-- /form -->
+
+        <!-- ── SUCCESS STATE (hidden until submission) ── -->
+        <div class="success-state" id="success-state" role="status" aria-live="polite">
+          <div class="success-ring" aria-hidden="true">
+            <svg viewBox="0 0 40 40" aria-hidden="true">
+              <path d="M8 20 L16 28 L32 12" />
+            </svg>
+          </div>
+          <h2 class="success-title">Review submitted!</h2>
+          <p class="success-sub">
+            Thank you — your feedback makes Gym Master better<br>for every member.
+          </p>
+          <button class="btn-secondary" id="btn-submit-another">
+            Submit another review
+          </button>
+        </div>
+
+      </article><!-- /form card -->
+
+      <!-- BREAKDOWN CARD -->
+      <article class="card" aria-label="Rating breakdown">
+        <h2 class="card-title">
+          <span class="card-title-icon" aria-hidden="true">▦</span>
+          Rating breakdown
+        </h2>
+
+        <div class="avg-display" aria-label="Overall average rating">
+          <div class="avg-number" id="avg-big">—</div>
+          <div class="avg-right">
+            <div class="avg-stars" id="avg-stars" aria-hidden="true"></div>
+            <div class="avg-sub" id="avg-sub">No reviews yet</div>
+          </div>
+        </div>
+
+        <div id="breakdown-bars" aria-label="Reviews per star rating"></div>
+      </article>
+
+    </div><!-- /left column -->
+
+    <!-- ── RIGHT COLUMN: Live Feed ── -->
+    <article class="card" aria-label="Live member reviews">
+
+      <div class="feed-header">
+        <h2 class="card-title" style="margin-bottom:0">
+          <span class="card-title-icon" aria-hidden="true">⌁</span>
+          Live reviews
+        </h2>
+        <div class="live-badge" role="status" aria-label="Live updates active">
+          <div class="live-dot" aria-hidden="true"></div>
+          Live updates on
+        </div>
+      </div>
+
+      <hr class="feed-divider" />
+
+      <!-- Filter chips -->
+      <div class="filter-bar" role="group" aria-label="Filter reviews by star rating" style="margin-top: var(--s4)">
+        <span class="filter-label" aria-hidden="true">Filter:</span>
+        <button class="chip active" data-filter="all" aria-pressed="true">All</button>
+        <button class="chip" data-filter="5" aria-pressed="false">5 ★</button>
+        <button class="chip" data-filter="4" aria-pressed="false">4 ★</button>
+        <button class="chip" data-filter="3" aria-pressed="false">3 ★</button>
+        <button class="chip" data-filter="2" aria-pressed="false">2 ★</button>
+        <button class="chip" data-filter="1" aria-pressed="false">1 ★</button>
+      </div>
+
+      <!-- Sort row -->
+      <div class="sort-row">
+        <div class="sort-row-left">
+          Showing <strong id="review-count">0</strong> review<span id="review-plural">s</span>
+        </div>
+        <select class="sort-select" id="sort-select" aria-label="Sort reviews">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="highest">Highest rated</option>
+          <option value="lowest">Lowest rated</option>
+        </select>
+      </div>
+
+      <!-- Reviews list -->
+      <div id="reviews-list" role="feed" aria-label="Member reviews" aria-live="polite"></div>
+
+    </article><!-- /feed card -->
+
+  </main><!-- /main grid -->
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span class="footer-copy">© 2025 Gym Master. All rights reserved.</span>
+    <nav class="footer-links" aria-label="Footer links">
+      <a href="#" class="footer-link">Privacy Policy</a>
+      <a href="#" class="footer-link">Terms of Service</a>
+      <a href="#" class="footer-link">Contact</a>
+    </nav>
+  </footer>
+
+</div><!-- /page-wrap -->
+
+<!-- TOAST CONTAINER — uses position:fixed inside a non-iframe context -->
+<div class="toast-wrap" id="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     JAVASCRIPT — State management, rendering, storage
+════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─────────────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────────────── */
+const STORAGE_KEY = 'gymmaster-feedback-v3';
+const MAX_REVIEWS = 100;
+const MAX_VISIBLE  = 30;
+
+const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'];
+
+/** Avatar colour sets (background / text) for 5 cycling variants */
+const AVATAR_COLORS = [
+  { bg: '#0E2040', color: '#60A5FA' }, // blue
+  { bg: '#052912', color: '#4ADE80' }, // green
+  { bg: '#2A1D00', color: '#FBB040' }, // amber
+  { bg: '#2D0707', color: '#F87171' }, // red
+  { bg: '#1E0A35', color: '#C084FC' }, // purple
+];
+
+/** Pre-seeded demo reviews so the feed looks populated on first load */
+const SEED_REVIEWS = [
+  {
+    id: 9001,
+    name: 'Priya Sharma',
+    rating: 5,
+    comment: 'The trainers here are exceptional — incredible progress in just 3 months. Facilities are always spotless and the atmosphere is genuinely motivating. Worth every rupee.',
+    ts: Date.now() - 2 * 864e5,
+  },
+  {
+    id: 9002,
+    name: 'Rohan Iyer',
+    rating: 4,
+    comment: 'Top-notch equipment and great class variety. The HIIT sessions are challenging and well-structured. Would love extended evening hours on weekdays.',
+    ts: Date.now() - 4 * 864e5,
+  },
+  {
+    id: 9003,
+    name: 'Ananya Mehta',
+    rating: 5,
+    comment: 'Best gym in the city without question. The personalised training plan made a massive difference. Clean locker rooms, attentive staff — couldn\'t ask for more.',
+    ts: Date.now() - 7 * 864e5,
+  },
+  {
+    id: 9004,
+    name: 'Kabir Singh',
+    rating: 3,
+    comment: 'Decent gym overall. Peak-hour crowds can be frustrating and some treadmills need servicing. The recent equipment upgrades are a step in the right direction.',
+    ts: Date.now() - 11 * 864e5,
+  },
+  {
+    id: 9005,
+    name: 'Deepika Patel',
+    rating: 5,
+    comment: 'The yoga classes here genuinely changed my daily routine. Instructors are patient, knowledgeable, and clearly invested in every member\'s progress.',
+    ts: Date.now() - 14 * 864e5,
+  },
+  {
+    id: 9006,
+    name: 'Arjun Nair',
+    rating: 4,
+    comment: 'Excellent value for the membership fee. The nutrition counselling sessions are an underrated bonus. Staff is consistently helpful and professional.',
+    ts: Date.now() - 19 * 864e5,
+  },
+  {
+    id: 9007,
+    name: 'Meera Pillai',
+    rating: 5,
+    comment: 'Joined for CrossFit and stayed for everything else. The community here is extraordinarily supportive. This is the best gym decision I have made.',
+    ts: Date.now() - 24 * 864e5,
+  },
+  {
+    id: 9008,
+    name: 'Siddharth Rao',
+    rating: 2,
+    comment: 'Equipment quality is good but the booking app needs a serious overhaul. Too many conflicts and very slow support response times. Hopefully improving soon.',
+    ts: Date.now() - 30 * 864e5,
+  },
+  {
+    id: 9009,
+    name: 'Kavitha Nambiar',
+    rating: 5,
+    comment: 'The swimming pool and sauna facilities are world-class. Always clean and never overcrowded in the mornings. The lifetime membership is the best investment.',
+    ts: Date.now() - 36 * 864e5,
+  },
+  {
+    id: 9010,
+    name: 'Vikram Desai',
+    rating: 4,
+    comment: 'Great range of free weights and machines. The personal trainers are knowledgeable and always available to correct your form. Highly recommend the morning batch.',
+    ts: Date.now() - 45 * 864e5,
+  },
+];
+
+/* ─────────────────────────────────────────────
+   APPLICATION STATE
+───────────────────────────────────────────── */
+let reviews        = [];      // master reviews array
+let selectedRating = 0;       // currently selected star (1–5)
+let hoverRating    = 0;       // star currently being hovered (0 = none)
+let activeFilter   = 'all';   // current filter chip
+let activeSort     = 'newest';// current sort option
+let lastNewId      = null;    // id of the most recently added review (for animation)
+
+/* ─────────────────────────────────────────────
+   UTILITY FUNCTIONS
+───────────────────────────────────────────── */
+
+/** Escape HTML to prevent XSS */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
+/** Get up-to-2-letter initials from a name */
+function getInitials(name) {
+  return name.trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(w => w[0] || '')
+    .join('')
+    .toUpperCase();
+}
+
+/** Human-readable relative time */
+function timeAgo(ts) {
+  const diff  = Date.now() - ts;
+  const mins  = Math.floor(diff / 60_000);
+  if (mins  <  2)  return 'Just now';
+  if (mins  < 60)  return `${mins}m ago`;
+  const hrs  = Math.floor(mins  / 60);
+  if (hrs   < 24)  return `${hrs}h ago`;
+  const days = Math.floor(hrs   / 24);
+  if (days  <  7)  return `${days}d ago`;
+  const wks  = Math.floor(days  /  7);
+  if (wks   <  5)  return `${wks}w ago`;
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+/** Compute aggregate statistics from the reviews array */
+function calcStats() {
+  const n = reviews.length;
+  if (!n) return { avg: 0, total: 0, fiveStarPct: 0, thisMonth: 0 };
+  const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / n;
+  const fiveCount = reviews.filter(r => r.rating === 5).length;
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const thisMonth = reviews.filter(r => r.ts >= startOfMonth.getTime()).length;
+  return {
+    avg,
+    total: n,
+    fiveStarPct: fiveCount / n,
+    thisMonth,
+  };
+}
+
+/** Distribution of ratings (index 0 → 1★, index 4 → 5★) */
+function getRatingCounts() {
+  const counts = [0, 0, 0, 0, 0];
+  reviews.forEach(r => counts[r.rating - 1]++);
+  return counts;
+}
+
+/** Filter + sort the reviews array, return a new array */
+function getFilteredSorted() {
+  let result = [...reviews];
+  if (activeFilter !== 'all') {
+    result = result.filter(r => r.rating === parseInt(activeFilter, 10));
+  }
+  switch (activeSort) {
+    case 'newest':  result.sort((a, b) => b.ts - a.ts); break;
+    case 'oldest':  result.sort((a, b) => a.ts - b.ts); break;
+    case 'highest': result.sort((a, b) => b.rating - a.rating || b.ts - a.ts); break;
+    case 'lowest':  result.sort((a, b) => a.rating - b.rating || b.ts - a.ts); break;
+  }
+  return result;
+}
+
+/* ─────────────────────────────────────────────
+   PERSISTENCE — localStorage
+───────────────────────────────────────────── */
+
+function loadReviews() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        reviews = parsed;
+        return;
+      }
+    }
+  } catch (_) { /* silently fall through to seed data */ }
+  reviews = [...SEED_REVIEWS];
+}
+
+function saveReviews() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews.slice(0, MAX_REVIEWS)));
+  } catch (_) { /* storage quota exceeded — continue without saving */ }
+}
+
+/* ─────────────────────────────────────────────
+   RENDER: STATS CARDS
+───────────────────────────────────────────── */
+
+function updateStatCards() {
+  const s = calcStats();
+
+  /** Flash animation to draw attention to updated value */
+  function setWithFlash(id, value) {
+    const el = document.getElementById(id);
+    el.textContent = value;
+    el.classList.remove('updated');
+    void el.offsetWidth; // trigger reflow to restart animation
+    el.classList.add('updated');
+  }
+
+  const avgText = s.total ? s.avg.toFixed(1) : '—';
+  const fiveText = s.total ? Math.round(s.fiveStarPct * 100) + '%' : '—';
+
+  setWithFlash('stat-avg',   avgText);
+  setWithFlash('stat-total', s.total);
+  setWithFlash('stat-five',  fiveText);
+  setWithFlash('stat-month', s.thisMonth);
+}
+
+/* ─────────────────────────────────────────────
+   RENDER: INTERACTIVE STARS
+───────────────────────────────────────────── */
+
+function renderStarGroup() {
+  const group = document.getElementById('star-group');
+  group.innerHTML = Array.from({ length: 5 }, (_, i) => {
+    const val = i + 1;
+    const isLit = val <= selectedRating;
+    return `<button
+      type="button"
+      class="star-btn${isLit ? ' lit' : ''}"
+      data-val="${val}"
+      aria-label="${val} star${val > 1 ? 's' : ''}"
+      aria-pressed="${isLit}"
+    >★</button>`;
+  }).join('');
+
+  // Attach hover and click handlers
+  group.querySelectorAll('.star-btn').forEach(btn => {
+    const val = parseInt(btn.dataset.val, 10);
+
+    btn.addEventListener('mouseenter', () => {
+      hoverRating = val;
+      updateStarDisplay();
+    });
+
+    btn.addEventListener('click', () => {
+      selectedRating = val;
+      hoverRating    = 0;
+      // Trigger pop animation on this specific button
+      btn.classList.add('pop');
+      setTimeout(() => btn.classList.remove('pop'), 350);
+      updateStarDisplay();
+      // Clear rating error
+      document.getElementById('err-rating').classList.remove('show');
+      document.getElementById('field-comment').classList.remove('error');
+    });
+  });
+
+  group.addEventListener('mouseleave', () => {
+    hoverRating = 0;
+    updateStarDisplay();
+  });
+
+  // Keyboard navigation (arrow keys within the star group)
+  group.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    if      (e.key === 'ArrowRight' && selectedRating < 5) selectedRating++;
+    else if (e.key === 'ArrowLeft'  && selectedRating > 1) selectedRating--;
+    else if (e.key === 'End')   selectedRating = 5;
+    else if (e.key === 'Home')  selectedRating = 1;
+    updateStarDisplay();
+  });
+
+  updateStarDisplay();
+}
+
+function updateStarDisplay() {
+  const active = hoverRating || selectedRating;
+
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    const val = parseInt(btn.dataset.val, 10);
+    btn.classList.remove('lit', 'preview');
+    if (hoverRating > 0) {
+      if (val <= hoverRating) btn.classList.add('preview');
+    } else {
+      if (val <= selectedRating) btn.classList.add('lit');
+    }
+    btn.setAttribute('aria-pressed', String(val <= selectedRating));
+  });
+
+  const labelEl = document.getElementById('rating-label-text-value');
+  labelEl.textContent = active ? RATING_LABELS[active] : '';
+  labelEl.style.opacity = active ? '1' : '0';
+}
+
+/* ─────────────────────────────────────────────
+   RENDER: BREAKDOWN BARS
+───────────────────────────────────────────── */
+
+function renderBreakdownBars() {
+  const counts = getRatingCounts();
+  const total  = reviews.length || 1;
+  const wrap   = document.getElementById('breakdown-bars');
+
+  // Average display
+  const s = calcStats();
+  document.getElementById('avg-big').textContent = s.total ? s.avg.toFixed(1) : '—';
+
+  // Average stars display
+  const avgStarsEl = document.getElementById('avg-stars');
+  const avgVal = s.avg;
+  avgStarsEl.innerHTML = Array.from({ length: 5 }, (_, i) => {
+    const cls = i < Math.round(avgVal) ? 'mini-star lit' : 'mini-star empty';
+    return `<span class="${cls}">★</span>`;
+  }).join('');
+
+  document.getElementById('avg-sub').textContent =
+    s.total ? `Based on ${s.total} review${s.total !== 1 ? 's' : ''}` : 'No reviews yet';
+
+  // Bars (5★ → 1★ descending)
+  wrap.innerHTML = [5, 4, 3, 2, 1].map(star => {
+    const count = counts[star - 1];
+    const pct   = Math.round((count / total) * 100);
+    return `
+      <div
+        class="breakdown-row"
+        data-star="${star}"
+        role="button"
+        tabindex="0"
+        title="Show only ${star}-star reviews"
+        aria-label="${star} stars: ${count} reviews, ${pct}%"
+      >
+        <span class="bd-star-lbl">${star} ★</span>
+        <div class="bd-track">
+          <div class="bd-fill" data-width="${pct}" style="width:0"></div>
+        </div>
+        <span class="bd-count">${count}</span>
+        <span class="bd-pct">${pct}%</span>
+      </div>`;
+  }).join('');
+
+  // Animate bars after paint — double rAF ensures CSS transition fires
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    wrap.querySelectorAll('.bd-fill').forEach(el => {
+      el.style.width = el.dataset.width + '%';
+    });
+  }));
+
+  // Make rows clickable (sets active filter + syncs chips)
+  wrap.querySelectorAll('.breakdown-row').forEach(row => {
+    const activate = () => {
+      const star = row.dataset.star;
+      activeFilter = star;
+      syncFilterChips(star);
+      renderReviewsList();
+    };
+    row.addEventListener('click', activate);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+    });
+  });
+}
+
+/* ─────────────────────────────────────────────
+   RENDER: REVIEWS LIST
+───────────────────────────────────────────── */
+
+function renderReviewsList() {
+  const filtered = getFilteredSorted();
+  const visible  = filtered.slice(0, MAX_VISIBLE);
+  const list     = document.getElementById('reviews-list');
+
+  // Update count display
+  document.getElementById('review-count').textContent = filtered.length;
+  document.getElementById('review-plural').textContent = filtered.length !== 1 ? 's' : '';
+
+  if (!visible.length) {
+    list.innerHTML = `
+      <div class="empty-state" role="status">
+        <div class="empty-icon" aria-hidden="true">◌</div>
+        <div class="empty-title">No reviews found</div>
+        <div class="empty-sub">Try a different filter or be the first to leave a ${activeFilter !== 'all' ? activeFilter + '-star ' : ''}review.</div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = visible.map(r => {
+    const colorSet  = AVATAR_COLORS[r.id % AVATAR_COLORS.length];
+    const avatarStyle = `background:${colorSet.bg};color:${colorSet.color}`;
+    const initials  = getInitials(r.name);
+    const isNew     = r.id === lastNewId;
+
+    // Star display
+    const starsHtml = Array.from({ length: 5 }, (_, i) =>
+      `<span class="mini-star ${i < r.rating ? 'lit' : 'empty'}" aria-hidden="true">★</span>`
+    ).join('');
+
+    // Rating badge
+    const badgeClass = `rating-badge r${r.rating}`;
+    const badgeLabel = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][r.rating] || '';
+
+    return `
+      <article
+        class="review-item${isNew ? ' new-entry' : ''}"
+        aria-label="Review by ${escHtml(r.name)}, ${r.rating} stars"
+      >
+        <div class="review-header">
+          <div class="avatar" style="${avatarStyle}" aria-hidden="true">${escHtml(initials)}</div>
+          <div class="review-meta">
+            <div class="reviewer-name">${escHtml(r.name)}</div>
+            <div class="review-time">${timeAgo(r.ts)}</div>
+          </div>
+          <span class="${badgeClass}" aria-label="${r.rating} star rating">
+            ★ ${r.rating} · ${badgeLabel}
+          </span>
+        </div>
+        <div class="review-stars-display" aria-label="${r.rating} out of 5 stars">
+          ${starsHtml}
+        </div>
+        <p class="review-body">${escHtml(r.comment)}</p>
+      </article>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────
+   FILTER CHIP SYNC
+───────────────────────────────────────────── */
+
+function syncFilterChips(activeValue) {
+  activeFilter = activeValue;
+  document.querySelectorAll('.chip').forEach(chip => {
+    const isActive = chip.dataset.filter === activeValue;
+    chip.classList.toggle('active', isActive);
+    chip.setAttribute('aria-pressed', String(isActive));
+  });
+}
+
+/* ─────────────────────────────────────────────
+   VALIDATION
+───────────────────────────────────────────── */
+
+function validateForm() {
+  let isValid = true;
+
+  const name    = document.getElementById('field-name').value.trim();
+  const comment = document.getElementById('field-comment').value.trim();
+
+  // Name
+  const errName = document.getElementById('err-name');
+  if (!name) {
+    errName.classList.add('show');
+    document.getElementById('field-name').classList.add('error');
+    isValid = false;
+  } else {
+    errName.classList.remove('show');
+    document.getElementById('field-name').classList.remove('error');
+  }
+
+  // Rating
+  const errRating = document.getElementById('err-rating');
+  if (!selectedRating) {
+    errRating.classList.add('show');
+    isValid = false;
+  } else {
+    errRating.classList.remove('show');
+  }
+
+  // Comment
+  const errComment = document.getElementById('err-comment');
+  if (comment.length < 10) {
+    errComment.classList.add('show');
+    document.getElementById('field-comment').classList.add('error');
+    isValid = false;
+  } else {
+    errComment.classList.remove('show');
+    document.getElementById('field-comment').classList.remove('error');
+  }
+
+  return isValid;
+}
+
+/* ─────────────────────────────────────────────
+   TOAST
+───────────────────────────────────────────── */
+
+function showToast(message, icon = '✓') {
+  const wrap  = document.getElementById('toast-wrap');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<span class="toast-icon" aria-hidden="true">${icon}</span>${escHtml(message)}`;
+  wrap.appendChild(toast);
+
+  // Auto-remove after 3.5 s with exit animation
+  setTimeout(() => {
+    toast.classList.add('out');
+    setTimeout(() => toast.remove(), 350);
+  }, 3500);
+}
+
+/* ─────────────────────────────────────────────
+   FORM SUBMIT HANDLER
+───────────────────────────────────────────── */
+
+async function handleFormSubmit(e) {
+  e.preventDefault();
+
+  if (!validateForm()) {
+    // Scroll to first error
+    const firstError = document.querySelector('.field-error.show');
+    if (firstError) {
+      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+
+  // Loading state
+  btn.disabled = true;
+  btn.innerHTML = `<div class="submit-spinner" aria-hidden="true"></div> Submitting…`;
+
+  // Brief artificial delay — feels intentional and trustworthy
+  await new Promise(resolve => setTimeout(resolve, 550));
+
+  // Build new review object
+  const newReview = {
+    id:      Date.now(),
+    name:    document.getElementById('field-name').value.trim(),
+    rating:  selectedRating,
+    comment: document.getElementById('field-comment').value.trim(),
+    ts:      Date.now(),
+  };
+
+  // Add to array (newest first) and cap size
+  reviews.unshift(newReview);
+  if (reviews.length > MAX_REVIEWS) reviews = reviews.slice(0, MAX_REVIEWS);
+
+  // Persist
+  saveReviews();
+
+  // Reset form state
+  selectedRating = 0;
+  hoverRating    = 0;
+  lastNewId      = newReview.id;
+
+  // Show success state
+  const formEl    = document.getElementById('feedback-form');
+  const successEl = document.getElementById('success-state');
+  formEl.style.display    = 'none';
+  successEl.style.display = 'flex';
+  // Fade in
+  successEl.style.opacity = '0';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    successEl.style.transition = 'opacity 0.35s ease';
+    successEl.style.opacity    = '1';
+  }));
+
+  // Update all widgets
+  updateStatCards();
+  renderBreakdownBars();
+  // Switch to "All" filter + newest sort so the new review is always visible
+  syncFilterChips('all');
+  document.getElementById('sort-select').value = 'newest';
+  activeSort = 'newest';
+  renderReviewsList();
+
+  // Show toast
+  showToast(`Review submitted! ${newReview.rating} ★ — thank you, ${newReview.name.split(' ')[0]}!`, '★');
+}
+
+/* ─────────────────────────────────────────────
+   RESET FORM
+───────────────────────────────────────────── */
+
+function resetFormToInitialState() {
+  const formEl    = document.getElementById('feedback-form');
+  const successEl = document.getElementById('success-state');
+  const btn       = document.getElementById('submit-btn');
+
+  // Restore original elements
+  formEl.reset();
+  formEl.style.display    = '';
+  successEl.style.display = 'none';
+  successEl.style.opacity = '';
+  successEl.style.transition = '';
+
+  // Reset state
+  selectedRating = 0;
+  hoverRating    = 0;
+  btn.disabled   = false;
+  btn.innerHTML  = 'Submit Review';
+
+  // Clear validation UI
+  document.querySelectorAll('.field-error').forEach(el => el.classList.remove('show'));
+  document.querySelectorAll('.form-input, .form-textarea').forEach(el => el.classList.remove('error'));
+  document.getElementById('char-count').textContent = '0 / 400';
+  document.getElementById('char-count').classList.remove('warn', 'limit');
+
+  // Re-render star group
+  renderStarGroup();
+
+  // Scroll to form
+  document.getElementById('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ─────────────────────────────────────────────
+   EVENT LISTENERS
+───────────────────────────────────────────── */
+
+// Form submit
+document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
+
+// "Submit another" button
+document.getElementById('btn-submit-another').addEventListener('click', resetFormToInitialState);
+
+// Character counter for comment field
+document.getElementById('field-comment').addEventListener('input', function () {
+  const len     = this.value.length;
+  const counter = document.getElementById('char-count');
+  counter.textContent = `${len} / 400`;
+  counter.classList.toggle('warn',  len > 320);
+  counter.classList.toggle('limit', len > 380);
+  // Clear error once threshold is met
+  if (len >= 10) {
+    document.getElementById('err-comment').classList.remove('show');
+    this.classList.remove('error');
+  }
+});
+
+// Clear name error on input
+document.getElementById('field-name').addEventListener('input', function () {
+  if (this.value.trim()) {
+    document.getElementById('err-name').classList.remove('show');
+    this.classList.remove('error');
+  }
+});
+
+// Filter chips
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    syncFilterChips(chip.dataset.filter);
+    renderReviewsList();
+  });
+});
+
+// Sort select
+document.getElementById('sort-select').addEventListener('change', function () {
+  activeSort = this.value;
+  renderReviewsList();
+});
+
+/* ─────────────────────────────────────────────
+   FULL RENDER — called once on init
+───────────────────────────────────────────── */
+
+function renderAll() {
+  updateStatCards();
+  renderStarGroup();
+  renderBreakdownBars();
+  renderReviewsList();
+}
+
+/* ─────────────────────────────────────────────
+   BOOTSTRAP
+───────────────────────────────────────────── */
+loadReviews();
+renderAll();
+
+// Refresh time labels every 60 s so "Just now" etc. stay accurate
+setInterval(() => {
+  renderReviewsList();
+}, 60_000);
+</script>
+</body>
+</html>

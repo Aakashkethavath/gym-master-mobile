@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml  —  DEVELOPMENT
+#
+# Brings up:
+#   mongo   — MongoDB 7 with a persistent named volume
+#   api     — Node.js API (hot-reload via nodemon, src mounted as a volume)
+#
+# Usage:
+#   docker compose up -d            # start everything
+#   docker compose logs -f api      # tail API logs
+#   docker compose exec api sh      # shell into the container
+#   docker compose down -v          # stop + delete volumes (wipes DB)
+#
+# NOTE: The API container mounts ./server/src so code changes are reflected
+#       immediately (nodemon watches for changes).
+#       Do NOT use this compose file in production — use docker-compose.prod.yml.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB ───────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: gymmaster-mongo-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"      # expose on localhost for local tooling (Compass, etc.)
+    volumes:
+      - mongo-data-dev:/data/db
+      - ./mongo-init/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    environment:
+      MONGO_INITDB_DATABASE: gymmaster
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── API (development — hot-reload) ────────────────────────────────────────
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      # Override the production CMD to use nodemon in dev.
+      target: production        # still use the hardened image
+    container_name: gymmaster-api-dev
+    restart: unless-stopped
+    command: ["node", "--watch", "src/server.js"]  # Node 20 built-in watch
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source so edits are reflected without rebuilding the image.
+      - ./server/src:/app/src:ro
+    env_file:
+      - ./server/.env           # create from .env.example
+    environment:
+      # Override the connection string to use the compose service name.
+      MONGODB_URI: mongodb://mongo:27017/gymmaster
+      NODE_ENV: development
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/v1/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mongo-data-dev:
+    driver: local
