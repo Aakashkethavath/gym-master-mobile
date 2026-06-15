@@ -1,4 +1,5 @@
 import React from 'react';
+import { User } from '@/api';
 import {
   View, Text, StyleSheet, FlatList,
   ActivityIndicator, RefreshControl,
@@ -9,7 +10,6 @@ import {
   useAllPayments, useAttendanceStats,
   useAllSubscriptions, useAllUsers,
 } from '@/hooks';
-import { User } from '@/api';
 import {
   Card, StatCard, SectionHeader, Badge, Avatar, Divider,
 } from '@/components';

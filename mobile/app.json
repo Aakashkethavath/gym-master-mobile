@@ -46,6 +46,14 @@
     "scheme": "gymmaster",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "45f666d1-22dd-46b9-9837-418674aa5056"
+      }
     }
   }
 }

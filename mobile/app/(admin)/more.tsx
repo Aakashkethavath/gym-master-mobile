@@ -1,4 +1,5 @@
 import React from 'react';
+import { Payment } from '@/api';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Alert, ActivityIndicator, Platform,
@@ -8,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useAllPayments } from '@/hooks';
 import { Card, StatCard, SectionHeader, Badge, Avatar } from '@/components';
-import { Payment } from '@/api';
 import { palette, spacing, typography } from '@/theme/tokens';
 import { formatCurrency, formatDate } from '@/utils/format';
 

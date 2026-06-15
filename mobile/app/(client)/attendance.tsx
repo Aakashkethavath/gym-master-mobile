@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { AttendanceRecord } from '@/api';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
 } from 'react-native';
@@ -8,7 +9,6 @@ import { useMyAttendance } from '@/hooks';
 import { Card, StatCard } from '@/components';
 import { palette, spacing, typography, radius } from '@/theme/tokens';
 import { toDateKey, formatShortDate } from '@/utils/format';
-import { AttendanceRecord } from '@/api';
 
 /** Build a grid of the last 12 weeks (Mon→Sun columns). */
 function buildGrid(attendedSet: Set<string>) {
